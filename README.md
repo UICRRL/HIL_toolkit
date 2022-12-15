@@ -1,6 +1,9 @@
 # HIL Toolkit: Acquisition, estimation and optimization of human in the loop experiments
 Toolkit for human in the loop optimization
 
+>**Warning**
+> This is a Fork of the repository [Prakyathkantharaju/HIL_toolkit](https://github.com/Prakyathkantharaju/HIL_toolkit). Please visit there for updated version.
+
 > **Note**
 > This is a part of an upcoming publication. Please use with caution.
 > The code is not fully tested. If you find any bugs please report them in discussion section or create an issue.
