@@ -32,7 +32,7 @@ class BayesianOptimization(object):
     Bayesian Optimization class for HIL
     """
     def __init__(self, n_parms:int = 1, range: np.ndarray = np.array([0,1]), noise_range :np.ndarray = np.array([0.005, 10]), acq: str = "ei",
-        Kernel: str = "SE", model_save_path : str = "", device : str = "cpu" , plot: bool = False, kernel_parms: Dict = {}) -> None:
+        Kernel: str = "SE", model_save_path : str = "", device : str = "cpu" , plot: bool = False, optimization_iter: int = 500 , kernel_parms: Dict = {}) -> None:
         """Bayesian optimization for HIL
 
         Args:
@@ -47,11 +47,11 @@ class BayesianOptimization(object):
         """
         # TODO have an options of sending in the kernel parameters.
         if Kernel == "SE":
-            self.kernel = SE()
+            self.kernel = SE(self.n_parms)
             self.covar_module = self.kernel.get_covr_module()
 
         else:
-            self.kernel = Matern()
+            self.kernel = Matern(self.n_parms)
             self.covar_module = self.kernel.get_covr_module()
         
         self.n_parms = n_parms
@@ -63,7 +63,7 @@ class BayesianOptimization(object):
             # this is temp
             self.model_save_path = "tmp_data/"
 
-        
+        self.optimization_iter = optimization_iter
 
         # place holder for model
         self.model = None
@@ -122,7 +122,31 @@ class BayesianOptimization(object):
         self.model.eval() #type: ignore
         output = self.model(range)     #type: ignore
         return torch.max(output).detach().numpy() #type: ignore
+    
+    def _training(self, model, likelihood,train_x,train_y):
 
+        """
+        Train the model using Adam Optimizer and gradient descent
+        Log Marginal Likelihood is used as the cost function
+        """
+           
+        parameter = list(model.parameters()) + list(likelihood.parameters())
+        optimizer = torch.optim.Adam(parameter, lr=0.01) 
+        mll= ExactMarginalLogLikelihood(likelihood, model).to(train_x)
+        
+
+        train_y=train_y.squeeze(-1)
+        loss = -mll(model(train_x), train_y) #type: ignore
+        self.logger.info("before training Loss: ", loss.item())
+        for i in range(500):
+            
+            optimizer.zero_grad()
+            output = model(train_x)
+            loss = -mll(output, train_y) #type: ignore
+            
+            loss.backward()
+            optimizer.step()
+        self.logger.info("after training Loss: ", loss.item()) 
 
     def _fit(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """Using the model and likelihood select the next data point to get next data points and acq value at that point
@@ -130,8 +154,12 @@ class BayesianOptimization(object):
         Returns:
             Tuple[torch.tensor, torch.tensor]: next parmaeter, value at the point
         """
-        mll = ExactMarginalLogLikelihood(self.likelihood, self.model)
-        fit_gpytorch_model(mll) # check I need to change anything
+        # tradition method
+        # mll = ExactMarginalLogLikelihood(self.likelihood, self.model)
+        # fit_gpytorch_model(mll) # check I need to change anything
+        # using manual gradient descent using adam optimizer.
+        self._training(self.model, self.likelihood, self.x, self.y)
+
 
         if self.acq_type == "ei":
             acq = qNoisyExpectedImprovement(self.model, self.x, sampler=IIDNormalSampler(self.N_POINTS, seed = 1234)) #type: ignore
