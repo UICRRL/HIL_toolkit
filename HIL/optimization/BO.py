@@ -47,11 +47,11 @@ class BayesianOptimization(object):
         """
         # TODO have an options of sending in the kernel parameters.
         if Kernel == "SE":
-            self.kernel = SE(self.n_parms)
+            self.kernel = SE(n_parms)
             self.covar_module = self.kernel.get_covr_module()
 
         else:
-            self.kernel = Matern(self.n_parms)
+            self.kernel = Matern(n_parms)
             self.covar_module = self.kernel.get_covr_module()
         
         self.n_parms = n_parms
