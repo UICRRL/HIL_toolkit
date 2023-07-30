@@ -26,6 +26,8 @@ Toolkit for human in the loop optimization
   - [Metabolic cost estimation.](#metabolic-cost-estimation)
     - [Estimation in scripts for offline.](#estimation-in-scripts-for-offline)
     - [Estimation in notebooks.](#estimation-in-notebooks)
+  - [Raspberry Pi Instructions](#raspberry-pi-instructions)
+  - [Acknowledgement](#acknowledgement)
 
 
 ## Requirements for the toolkit
@@ -86,5 +88,9 @@ Please refer the following paper for the details of the estimation.
 - To perform the estimation run the following notebook. `notebooks/estimation_cosmed.ipynb`
 - 
 
->**Note**
+## Raspberry Pi Instructions
+
+Please follow instrucction in the [Instructions_rpi.md](Instructions_rpi.md) file.
+
+## Acknowledgement
 > This is a Fork of the repository [Prakyathkantharaju/HIL_toolkit](https://github.com/Prakyathkantharaju/HIL_toolkit). Please visit there for updated version.
