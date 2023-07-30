@@ -31,7 +31,7 @@ class BayesianOptimization(object):
     """
     Bayesian Optimization class for HIL
     """
-    def __init__(self, n_parms:int = 1, range: np.ndarray = np.array([0,1]), noise_range :np.ndarray = np.array([0.005, 10]), acq: str = "ei",
+    def __init__(self, n_parms:int = 1, range: np.ndarray = np.array([0,1]), noise_range :np.ndarray = np.array([0.005, 10]), acq: str = "ei", maximization : bool = True, \
         Kernel: str = "SE", model_save_path : str = "", device : str = "cpu" , plot: bool = False, optimization_iter: int = 500 , kernel_parms: Dict = {}) -> None:
         """Bayesian optimization for HIL
 
@@ -56,6 +56,7 @@ class BayesianOptimization(object):
         
         self.n_parms = n_parms
         self.range = range.reshape(2,self.n_parms).astype(float)
+        self.maximization = maximization
         
         if len(model_save_path):
             self.model_save_path = model_save_path
@@ -91,6 +92,10 @@ class BayesianOptimization(object):
         # acquisition function type
         self.acq_type = acq
 
+        if self.n_parms == 2:
+            self.fig = plt.figure(figsize = (12,10))
+            self.ax = plt.axes(projection='3d')
+
     def _step(self) -> np.ndarray:
         """ Fit the model and identify the next parameter, also plots the model if plot is true
 
@@ -106,7 +111,10 @@ class BayesianOptimization(object):
         self._save_model()
 
         if self.PLOT:
-            self._plot()
+            if self.n_parms == 1:
+                self._plot()
+            elif self.n_parms == 2:
+                self._plot2d()
 
         return new_parameter
 
@@ -200,6 +208,72 @@ class BayesianOptimization(object):
         plt.fill_between(x_length.flatten(), lower.cpu().numpy(), upper.cpu().numpy(), alpha=0.2)
         plt.legend(['Observed Data', 'mean', 'Confidence'])
         plt.pause(0.01)
+
+    # Temp function will be replaced is some way
+    def _plot2d(self) -> None:
+        model=self.model
+        model.eval() #type: ignore
+        likelihood=self.likelihood
+        likelihood.eval()
+        self.ax.clear()
+        x = self.x.detach().numpy()
+        y = self.y.detach().numpy()
+        y_mean = y.mean()
+        y_std = y.std()
+        with torch.no_grad():
+            test_x = torch.linspace(self.range[0,0],self.range[1,0], 51).to(self.device)
+            test_y = torch.linspace(self.range[0,1],self.range[1,1],51).to(self.device)
+            XX,YY=torch.meshgrid(test_x,test_y,indexing='xy')
+            #print(test_x.shape)
+            XXX=torch.cat((XX.reshape(-1,1),YY.reshape(-1,1)),dim=1).double()
+            observed_pred = likelihood(model(XXX)) #type: ignore
+
+            # # Get upper and lower confidence bounds
+            lower, upper = observed_pred.confidence_region() #type: ignore
+            model_mean = observed_pred.mean*y_std + y_mean
+            lower=lower*y_std + y_mean
+            upper=upper*y_std + y_mean
+            ZZ=model_mean.view(51,51)
+            
+            if max is False:
+                ZZ = -ZZ
+                lower = -lower
+                upper = -upper
+                y = -self.y 
+
+            self.ax.plot_surface(XX.cpu().numpy(), YY.cpu().numpy(), ZZ.cpu().numpy(), cmap = 'winter',alpha=0.9) #type: ignore
+            #print(XXX[:,0].shape,XXX[:,1].shape,lower1.shape)
+            self.ax.plot_trisurf(XXX[:,0].cpu().numpy(), XXX[:,1].cpu().numpy(), lower.view(-1).cpu().numpy(),  #type: ignore
+                    linewidth = 0.2,
+                    antialiased = True,color='gainsboro',alpha=0.4,edgecolor='gainsboro') 
+            self.ax.plot_trisurf(XXX[:,0].cpu().numpy(), XXX[:,1].cpu().numpy(), upper.view(-1).cpu().numpy(), #type: ignore
+                    linewidth = 0.2,
+                    antialiased = True,color='gainsboro',alpha=0.4,edgecolor='gainsboro')
+            # find the location of minimum value
+            print(ZZ.cpu().numpy().shape, XX.cpu().numpy().shape, YY.cpu().numpy().shape)
+            ZZ = ZZ.cpu().numpy()
+            XX = XX.cpu().numpy()
+            YY = YY.cpu().numpy()
+            min_index = np.unravel_index(ZZ.argmin(), ZZ.shape)
+            logging.info(f"Min value is: {ZZ[min_index]}")
+            logging.info(f"Min location (Timing) is: {XX[min_index]}")
+            logging.info(f"Min location (Torque) is: {YY[min_index]}")
+            self.min_location = np.array([XX[min_index], YY[min_index]])
+            self.min_value = ZZ[min_index]
+
+            # finding max value
+            max_index = np.unravel_index(ZZ.argmax(), ZZ.shape)
+            logging.info(f"Max value is: {ZZ[max_index]}")
+            logging.info(f"Max location (Timing) is: {XX[max_index]}")
+            logging.info(f"Max location (Torque) is: {YY[max_index]}")
+            self.max_location = np.array([XX[max_index], YY[max_index]])
+            self.max_value = ZZ[max_index]
+            self.ax.scatter(x[:,0],x[:,1],y,color='r',marker='o',s=100,alpha=1) #type: ignore
+            self.ax.view_init(25, -135) #type: ignore
+            self.ax.set_zlabel("Cost",fontsize=18,rotation=90) #type: ignore
+            self.ax.set_xlabel("Timing",fontsize=16)
+            self.ax.set_ylabel("Torque",fontsize=16)
+            # plt.pause(0.01)
 
     def _save_model(self) -> None:
         """Save the model and data in the given path
