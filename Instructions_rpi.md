@@ -17,3 +17,5 @@ chmod +x setup_liblsl_rasp.sh
 ```
 
 This script will clone the liblsl and install lsl. It will also set the `liblsl.so` path to the `PYLSL_LIB` environment variable for your Raspberry Pi.
+
+After this, follow the install instructions in the main README.md file.
