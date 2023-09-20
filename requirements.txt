@@ -1,0 +1,8 @@
+torch
+botorch==0.7.2
+bleak
+neurokit2
+tqdm
+numpy
+pandas
+matplotlib
