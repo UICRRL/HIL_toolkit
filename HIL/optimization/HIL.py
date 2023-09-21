@@ -1,6 +1,7 @@
 import numpy as np
 import time
 import pylsl
+from typing import List
 
 
 from HIL.optimization.BO import BayesianOptimization
@@ -40,9 +41,55 @@ class HIL:
         # start optimization
         self.OPTIMIZATION = False
 
+        # normalization
+        if self.args["Optimization"]["normalize"]:
+            self.NORMALIZATION = True
+
         # The ones which are done.
         self.x_opt = np.array([])
         self.y_opt = np.array([])
+
+
+    def _normalize_x(self, x: np.ndarray) -> np.ndarray:
+        """Normalize x based on the range of the parameter
+
+        Args:
+            x (np.ndarray): x - parameters ( optimization parameters )
+
+        Returns:
+            np.ndarray: Normalized X parameters ( optimization parameters )
+        """
+        x = np.array(x).reshape(self.n, self.args["n_parms"])
+        range_x = np.array(self.args["Optimization"]["range"]).reshape(2, self.args['n_parms'])
+        x = (x - range_x[0,:]) / (range_x[1, :] - range_x[0, :])
+        return x
+
+    def _denormalize_x(self, x: np.ndarray) -> np.ndarray:
+        """Denormalize x based on the range of the parameter, This is to send the parameters to exokseleton.
+
+        Args:
+            x (np.ndarray): x - parameters ( optimization parameters )
+
+        Returns:
+            np.ndarray: Denormalized X parameters ( optimization parameters )
+        """
+        x = np.array(x).reshape(self.n, self.args["n_parms"])
+        range_x = np.array(self.args["Optimization"]["range"]).reshape(2, self.args['n_parms'])
+        x = x * (range_x[1, : ] - range_x[0, :]) + range_x[0, :]
+        return x
+
+    def _mean_normalize_y(self, y: np.ndarray) -> np.ndarray:
+        """Mean normalize y based on the range of the parameter
+
+        Args:
+            y (np.ndarray): y - cost function
+
+        Returns:
+            np.ndarray: Normalized y - cost function
+        """
+        y = np.array(y)
+        y = (y - np.mean(y)) / np.std(y)
+        return y
 
     def _outlet_cost(self) -> None:
         """Create an outlet function to send when the optimization has changed"""
@@ -159,9 +206,18 @@ class HIL:
                     print("################################")
                 else:
                     print(f"starting the optimization.")
-                    new_parameter = self.BO.run(
-                        self.x_opt.reshape(self.n, -1), self.y_opt.reshape(self.n, -1)
-                    )
+                    if self.NORMALIZATION:
+                        norm_x = self._normalize_x(self.x_opt)
+                        norm_y = self._mean_normalize_y(self.y_opt)
+                        new_parameter = self.BO.run(norm_x.reshape(self.n, -1), norm_y.reshape(self.n, -1))
+                        new_parameter = self._denormalize_x(new_parameter)
+
+                    else:
+                        new_parameter = self.BO.run(
+                            self.x_opt.reshape(self.n, -1),
+                            self.y_opt.reshape(self.n, -1),
+                        )
+                    
                     print(f"Next parameter is {new_parameter}")
                     self.outlet.push_sample(self.x_opt[-1].tolist() + [self.y_opt[-1]])
 
@@ -197,10 +253,17 @@ class HIL:
                         print(
                             f"recording cost function {self.y_opt[-1]}, for the parameter {self.x_opt[-1]}"
                         )
-                        new_parameter = self.BO.run(
-                            self.x_opt.reshape(self.n, -1),
-                            self.y_opt.reshape(self.n, -1),
-                        )
+                        if self.NORMALIZATION:
+                            norm_x = self._normalize_x(self.x_opt)
+                            norm_y = self._mean_normalize_y(self.y_opt)
+                            new_parameter = self.BO.run(norm_x.reshape(self.n, -1), norm_y.reshape(self.n, -1))
+                            new_parameter = self._denormalize_x(new_parameter)
+
+                        else:
+                            new_parameter = self.BO.run(
+                                self.x_opt.reshape(self.n, -1),
+                                self.y_opt.reshape(self.n, -1),
+                            )
                         print(f"Next parameter is {new_parameter}")
                         # TODO Need to save the parameters and data for each iteration
                         self.x = np.concatenate(
