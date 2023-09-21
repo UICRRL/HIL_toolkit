@@ -21,6 +21,10 @@ class HIL:
         self.x = np.array([])  # input parameter for the exoskeleton
         # self.y = np.array([]) # cost function
         self.args = args
+            # normalization
+        if self.args["Optimization"]["normalize"]:
+            self.NORMALIZATION = True
+
 
         # start the
         self.start_time = 0
@@ -41,9 +45,6 @@ class HIL:
         # start optimization
         self.OPTIMIZATION = False
 
-        # normalization
-        if self.args["Optimization"]["normalize"]:
-            self.NORMALIZATION = True
 
         # The ones which are done.
         self.x_opt = np.array([])
@@ -59,8 +60,8 @@ class HIL:
         Returns:
             np.ndarray: Normalized X parameters ( optimization parameters )
         """
-        x = np.array(x).reshape(self.n, self.args["n_parms"])
-        range_x = np.array(self.args["Optimization"]["range"]).reshape(2, self.args['n_parms'])
+        x = np.array(x).reshape(self.n, self.args["Optimization"]["n_parms"])
+        range_x = np.array(self.args["Optimization"]["range"]).reshape(2, self.args["Optimization"]['n_parms'])
         x = (x - range_x[0,:]) / (range_x[1, :] - range_x[0, :])
         return x
 
@@ -73,8 +74,8 @@ class HIL:
         Returns:
             np.ndarray: Denormalized X parameters ( optimization parameters )
         """
-        x = np.array(x).reshape(self.n, self.args["n_parms"])
-        range_x = np.array(self.args["Optimization"]["range"]).reshape(2, self.args['n_parms'])
+        x = np.array(x).reshape(-1, self.args["Optimization"]["n_parms"])
+        range_x = np.array(self.args["Optimization"]["range"]).reshape(2, self.args["Optimization"]['n_parms'])
         x = x * (range_x[1, : ] - range_x[0, :]) + range_x[0, :]
         return x
 
@@ -96,7 +97,7 @@ class HIL:
         info = pylsl.StreamInfo(
             name="Change_parm",
             type="Marker",
-            channel_count=self.args["n_parms"] + 1,
+            channel_count=self.args["Optimization"]["n_parms"] + 1,
             source_id="12345",
         )
         self.outlet = pylsl.StreamOutlet(info)
@@ -108,18 +109,25 @@ class HIL:
         self.start_time = 0
 
     def _start_optimization(self, args: dict) -> None:
-        """O Start the optimization function, this will start the BO module
+        """Start the optimization function, this will start the BO module
 
         Args:
             args (dict): Optimization args
         """
         print(args["range"][0], args["range"][1])
         print(np.array(list(args["range"])))
-        self.BO = BayesianOptimization(
-            n_parms=args["n_parms"],
-            range=np.array(list(args["range"])),
-            model_save_path=args["model_save_path"],
-        )
+        if self.NORMALIZATION:
+            self.BO = BayesianOptimization(
+                n_parms=args["n_parms"],
+                range=np.array([[0.0] * args["n_parms"], [1.0] * args["n_parms"]]),
+                model_save_path=args["model_save_path"],
+            )
+        else:
+            self.BO = BayesianOptimization(
+                n_parms=args["n_parms"],
+                range=np.array(list(args["range"])),
+                model_save_path=args["model_save_path"],
+            )
 
     def _start_cost(self, args: dict) -> None:
         """Start the cost extraction module
@@ -139,7 +147,7 @@ class HIL:
             print(f"############## Using cost function {self.cost.cost_name} ###")
             print(f"############################################################")
             self._generate_initial_parameters()
-            self.outlet.push_sample([0] * self.args["n_parms"] + [0])
+            self.outlet.push_sample(self.x[0,:].tolist() + [0])
         # start the optimization loop.
         while self.n < self.args["Optimization"]["n_steps"]:
             # Still in exploration
@@ -153,6 +161,7 @@ class HIL:
                     self.warm_up = False
 
                 self._get_cost()
+                self.outlet.push_sample(self.x[self.n,:].tolist() + [0])
                 if (self.cost_time - self.start_time) > self.args["Cost"][
                     "time"
                 ] and len(
@@ -210,6 +219,7 @@ class HIL:
                         norm_x = self._normalize_x(self.x_opt)
                         norm_y = self._mean_normalize_y(self.y_opt)
                         new_parameter = self.BO.run(norm_x.reshape(self.n, -1), norm_y.reshape(self.n, -1))
+                        print(f"Next parameter without norm is {new_parameter}")
                         new_parameter = self._denormalize_x(new_parameter)
 
                     else:
@@ -226,7 +236,7 @@ class HIL:
                         (
                             self.x,
                             new_parameter.reshape(
-                                1,
+                                1, self.args["Optimization"]["n_parms"]
                             ),
                         ),
                         axis=0,
@@ -236,6 +246,7 @@ class HIL:
             else:
                 print(f"In the optimization loop {self.n}, parameter {self.x[self.n]}")
                 self._get_cost()
+                self.outlet.push_sample(self.x[self.n,:].tolist() + [0])
                 if (self.cost_time - self.start_time) > self.args["Cost"]["time"]:
                     out = input("Press Y to record the data: N to remove it:")
                     if out == "N":
@@ -270,12 +281,12 @@ class HIL:
                             (
                                 self.x,
                                 new_parameter.reshape(
-                                    1,
+                                    1, self.args["Optimization"]["n_parms"]
                                 ),
                             ),
                             axis=0,
                         )
-                        self.outlet.push_sample([self.x_opt[-1], self.y_opt[-1]])
+                        # self.outlet.push_sample([self.x_opt[self.n,:].tolist(), self.y_opt[-1].tolist()])
                         self._reset_data_collection()
                         input("Enter to contiue")
 
@@ -283,10 +294,10 @@ class HIL:
 
     def _generate_initial_parameters(self) -> None:
         opt_args = self.args["Optimization"]
-        self.x = (
-            np.random.random(opt_args["n_start_points"])
-            * (opt_args["range"][1] - opt_args["range"][0])
-            + opt_args["range"][0]
+        range_ = np.array(list(opt_args["range"]))
+        # generate the initial parameters in the range of the parameter and in the shape of exploration x shape
+        self.x = np.random.uniform(
+            range_[0], range_[1], size=(opt_args["n_exploration"], opt_args["n_parms"])
         )
         # self.x[0]=35.0
         # self.x[1]=75.0

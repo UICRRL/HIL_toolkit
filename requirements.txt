@@ -6,3 +6,7 @@ tqdm
 numpy
 pandas
 matplotlib
+pyyaml
+pyxdf
+imageio
+

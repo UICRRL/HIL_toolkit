@@ -58,6 +58,7 @@ class ExtractCost:
             y,time_stamp = self.inlet.pull_sample(timeout=0.01)
             if y is not None:
                 print(len(y))
+                self.inlet.flush()
             return y, time_stamp
         else:
             print("Check the stream and restart this code......")

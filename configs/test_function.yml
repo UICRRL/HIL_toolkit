@@ -1,0 +1,21 @@
+
+Cost:
+  Name: "test_function" # name of the cost function stream
+  time: 5 # time of the cost function stream.
+  n_samples: 5
+  avg_time: 5 # average time of the cost function stream.
+  mean_time: 5 # mean time of the cost function.
+
+Optimization:
+  n_parms: 2 # number of parametes
+  n_steps: 15 # number of steps
+  n_exploration: 3 # number of exploration steps
+  range: [[0, 0],[85, 85]] # range of the parameters
+  model_save_path: "models/"
+  device: "cuda" # device to use
+  n_start_points: 3 # number of start points
+  acquisition: 'qei'
+  kernel_function: 'se'
+  GP: "Regular"
+  normalize: True            
+
