@@ -4,7 +4,7 @@ Toolkit for human in the loop optimization
 
 
 > **Note**
-> This is a part of a publication: [DOI](10.1109/ACCESS.2023.3299873)
+> This is a part of a publication: [DOI](https://ieeexplore.ieee.org/document/10196448)
 > 
 > If you find any bugs, please report them in the discussion section or create an issue.
 
