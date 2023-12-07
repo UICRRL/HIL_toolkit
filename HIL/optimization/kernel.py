@@ -25,7 +25,7 @@ class kernel(ABC):
 
 
 class SE(kernel):
-    def __init__(self, n_parms: int = 1,  length_scale : tuple[int, ...] = (0, 10), variance_constraints: tuple[int, ...] = (0, 10) )-> None :
+    def __init__(self, n_parms: int = 1,  length_scale : tuple[int, ...] = (0, 0.1), variance_constraints: tuple[int, ...] = (0, 0.1) )-> None :
         """
         SE kernel
         parms:
