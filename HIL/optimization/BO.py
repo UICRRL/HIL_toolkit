@@ -31,7 +31,7 @@ class BayesianOptimization(object):
     """
     Bayesian Optimization class for HIL
     """
-    def __init__(self, n_parms:int = 1, range: np.ndarray = np.array([0,1]), noise_range :np.ndarray = np.array([0.005, 1]), acq: str = "ei", maximization : bool = True, \
+    def __init__(self, n_parms:int = 1, range: np.ndarray = np.array([0,10]), noise_range :np.ndarray = np.array([0.005, 10]), acq: str = "ei", maximization : bool = True, \
         Kernel: str = "SE", model_save_path : str = "", device : str = "cpu" , plot: bool = False, optimization_iter: int = 500 , kernel_parms: Dict = {}) -> None:
         """Bayesian optimization for HIL
 
