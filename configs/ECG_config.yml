@@ -17,4 +17,5 @@ Optimization:
   acquisition: 'qei'
   kernel_function: 'se'
   GP: "Regular"
+  normalize: True  
 
